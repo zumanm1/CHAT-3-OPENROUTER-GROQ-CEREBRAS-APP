@@ -68,6 +68,20 @@ LLM_MODELS = {
         "cerebras-gpt-111m",
         "btlm-3b-8k-base",
         "gigaGPT-111b"
+    ],
+    "ollama": [
+        "llama3",
+        "llama3.1",
+        "llama3.2",
+        "llama3.3",
+        "mistral",
+        "mixtral",
+        "gemma",
+        "gemma2",
+        "phi3",
+        "qwen",
+        "qwen2",
+        "llama-guard-4"
     ]
 }
 
@@ -124,6 +138,26 @@ class LLMClient:
                 "Authorization": f"Bearer {self.api_key}",
                 "Content-Type": "application/json",
             }
+            
+        elif self.provider == "ollama":
+            # Ollama typically runs locally, doesn't require API key
+            self.base_url = "http://localhost:11434/api"
+            self.headers = {
+                "Content-Type": "application/json",
+            }
+            
+            # Check if Ollama is running
+            try:
+                ollama_check = requests.get("http://localhost:11434/api/tags", timeout=5)
+                if ollama_check.status_code != 200:
+                    st.error("🚨 Ollama is not running locally! Please start Ollama first.")
+                    st.stop()
+            except requests.exceptions.ConnectionError:
+                st.error("🚨 Ollama is not running locally! Please start Ollama first.")
+                st.stop()
+            except Exception as e:
+                st.error(f"🚨 Error connecting to Ollama: {str(e)}")
+                st.stop()
     
     def list_models(self):
         """Return predefined model list for the provider."""
@@ -143,9 +177,15 @@ class LLMClient:
             headers["HTTP-Referer"] = os.getenv("OPENROUTER_APP_URL", "http://localhost:8501")
             headers["X-Title"] = os.getenv("OPENROUTER_APP_NAME", "Streamlit Chat App")
         
+        # Determine the correct endpoint
+        if self.provider == "ollama":
+            url = f"{self.base_url}/chat"
+        else:
+            url = f"{self.base_url}/chat/completions"
+        
         try:
             response = requests.post(
-                url=f"{self.base_url}/chat/completions",
+                url=url,
                 headers=headers,
                 data=json.dumps(payload),
                 timeout=60
@@ -154,11 +194,20 @@ class LLMClient:
             # Check response status
             if response.status_code == 200:
                 response_data = response.json()
-                if "choices" in response_data and len(response_data["choices"]) > 0:
-                    return response_data["choices"][0]["message"]["content"]
+                if self.provider == "ollama":
+                    # Ollama response format
+                    if "message" in response_data:
+                        return response_data["message"]["content"]
+                    else:
+                        st.error("🚨 Unexpected response format from Ollama API")
+                        return None
                 else:
-                    st.error("🚨 Unexpected response format from API")
-                    return None
+                    # Other providers response format
+                    if "choices" in response_data and len(response_data["choices"]) > 0:
+                        return response_data["choices"][0]["message"]["content"]
+                    else:
+                        st.error("🚨 Unexpected response format from API")
+                        return None
             
             elif response.status_code == 401:
                 st.error("🚨 Authentication failed!")
@@ -171,7 +220,7 @@ class LLMClient:
                 }
                 
                 fallback_response = requests.post(
-                    url=f"{self.base_url}/chat/completions",
+                    url=url,
                     headers=minimal_headers,
                     data=json.dumps(payload),
                     timeout=60
@@ -180,7 +229,10 @@ class LLMClient:
                 if fallback_response.status_code == 200:
                     st.success("✅ Fallback method worked!")
                     response_data = fallback_response.json()
-                    return response_data["choices"][0]["message"]["content"]
+                    if self.provider == "ollama":
+                        return response_data["message"]["content"]
+                    else:
+                        return response_data["choices"][0]["message"]["content"]
                 else:
                     st.error(f"🚨 Fallback also failed: {fallback_response.text}")
                     return None
@@ -216,7 +268,7 @@ with st.sidebar:
     # Provider selection dropdown
     provider = st.selectbox(
         "Choose an LLM provider:",
-        options=["OpenRouter", "Groq", "Cerebras"],
+        options=["OpenRouter", "Groq", "Cerebras", "Ollama"],
         index=0,
         help="Select the LLM provider you want to use"
     )
@@ -228,6 +280,8 @@ with st.sidebar:
         st.info("Using Groq API for fast inference with Llama models")
     elif provider == "Cerebras":
         st.info("Using Cerebras API for Llama and Qwen models")
+    elif provider == "Ollama":
+        st.info("Using Ollama for locally hosted AI models")
     
     # Create client instance for selected provider
     try:

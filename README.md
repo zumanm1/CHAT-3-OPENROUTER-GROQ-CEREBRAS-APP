@@ -1,12 +1,13 @@
-# CHAT-3-OPENROUTER-GROQ-CEREBRAS
+# CHAT-4-OPENROUTER-GROQ-CEREBRAS-OLLAMA
 
 A Streamlit chat application that supports multiple LLM providers:
 - OpenRouter
 - Groq
 - Cerebras
+- Ollama
 
 ## Features
-- Switch between different LLM providers
+- Switch between different LLM providers (OpenRouter, Groq, Cerebras, Ollama)
 - Select from predefined models for each provider
 - Chat interface with message history
 - Error handling for API issues
@@ -19,7 +20,11 @@ A Streamlit chat application that supports multiple LLM providers:
    cp .env.example .env
    \`\`\`
    Then edit the .env file to add your actual API keys
-4. Run the app: \`streamlit run app.py\`
+4. For Ollama support:
+   - Install Ollama from https://ollama.com/download
+   - Pull models you want to use, e.g.: \`ollama pull llama3\`
+   - Start Ollama service: \`ollama serve\`
+5. Run the app: \`streamlit run app.py\`
 
 ## Usage
 Select your preferred provider and model from the sidebar, then start chatting in the main interface.
